@@ -1,4 +1,6 @@
 PREFIX     ?= $(HOME)/.local/share/noctalia/plugins
+BINDIR     ?= /usr/local/bin
+SUDO       ?= sudo
 PLUGIN_ID   = Lummotm/keepass
 DEST        = $(PREFIX)/kp-launcher
 DAEMON_REPO ?= https://github.com/Lummotm/kp-daemon.git
@@ -7,7 +9,6 @@ DAEMON_REPO ?= https://github.com/Lummotm/kp-daemon.git
 
 all: install
 
-# Clona el código de kp-daemon si no existe
 get-daemon:
 	@if [ ! -d "daemon" ]; then \
 		echo "Descargando código de kp-daemon..."; \
@@ -15,35 +16,44 @@ get-daemon:
 		rm -rf daemon/.git daemon/.github; \
 	fi
 
-# Instalación estándar: delega en el Makefile del daemon y copia los ficheros del plugin
+# Instalación para usuario: instala binario, plugin, activa y limpia la descarga
 install: get-daemon
 	@echo "Instalando binario kp-daemon..."
-	@$(MAKE) -C daemon install
-	@echo "Limpiando e instalando plugin en $(DEST)..."
+	@$(MAKE) -C daemon install BINDIR=$(BINDIR) SUDO=$(SUDO)
+	@echo "Instalando plugin en $(DEST)..."
 	@rm -rf $(DEST)
 	@mkdir -p $(DEST)
 	@cp plugin.toml finder.luau $(DEST)/
 	@echo "Activando plugin en Noctalia..."
 	@-noctalia msg plugins enable $(PLUGIN_ID)
-	@echo "Instalado correctamente."
+	@echo "Limpiando archivos temporales de compilación..."
+	@rm -rf daemon
+	@echo "Instalación completada y directorio limpio."
 
-# Modo desarrollo: compila el daemon y crea el symlink para desarrollo
+# Modo desarrollo: compila e instala, pero CONSERVA daemon/ y crea symlink
 dev: get-daemon
 	@echo "Instalando binario kp-daemon..."
-	@$(MAKE) -C daemon install
+	@$(MAKE) -C daemon install BINDIR=$(BINDIR) SUDO=$(SUDO)
 	@echo "Enlazando plugin para desarrollo..."
 	@rm -rf $(DEST)
 	@mkdir -p $(dir $(DEST))
 	@ln -s $(CURDIR) $(DEST)
 	@echo "Activando plugin en Noctalia..."
 	@-noctalia msg plugins enable $(PLUGIN_ID)
-	@echo "Modo desarrollo listo."
+	@echo "Modo desarrollo listo (carpeta daemon/ conservada)."
 
-# Desinstalación: delega en el daemon y desactiva el plugin
 uninstall:
+	@echo "Desactivando plugin en Noctalia..."
 	@-noctalia msg plugins disable $(PLUGIN_ID)
+	@echo "Eliminando archivos del plugin..."
 	@rm -rf $(DEST)
-	@if [ -d "daemon" ]; then $(MAKE) -C daemon uninstall; fi
+	@echo "Eliminando binario kp-daemon de $(BINDIR)..."
+	@if [ -d "daemon" ]; then \
+		$(MAKE) -C daemon uninstall BINDIR=$(BINDIR) SUDO=$(SUDO); \
+	else \
+		$(SUDO) rm -f $(BINDIR)/kp-daemon; \
+		rm -rf daemon/; \ 
+	fi
 	@echo "Desinstalado correctamente."
 
 clean:
