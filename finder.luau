@@ -47,11 +47,19 @@ end
 
 local function showList(query, text)
   local rows = {}
+
   if not loaded then
     table.insert(rows, row("action:start", "Base bloqueada", "Enter para abrir KeePass e introducir la contraseña", "lock"))
     launcher.setResults(query, rows)
     return
   end
+
+  -- Primero la opción de cerrar la base (si no hay filtro de texto)
+  if text == "" then
+    table.insert(rows, row("action:lock", "Cerrar la base", "Cierra la base y borra la memoria", "lock"))
+  end
+
+  -- Entradas de la base
   for i, e in entries do
     if #rows >= RESULT_LIMIT then
       break
@@ -60,12 +68,11 @@ local function showList(query, text)
       table.insert(rows, row("entry:" .. i, e.title or "(sin título)", e.user or "", "key"))
     end
   end
+
   if #rows == 0 then
     table.insert(rows, row("", "Sin resultados", text, "search-off"))
   end
-  if text == "" then
-    table.insert(rows, row("action:lock", "Bloquear", "Cierra la base y borra la memoria", "lock"))
-  end
+
   launcher.setResults(query, rows)
 end
 
@@ -96,7 +103,8 @@ function onQuery(query)
       showList(query, text)
     end
   end
-  -- recarga al abrir el launcher (consulta vacía) o si aún no hay lista
+
+  -- Recarga si la consulta está vacía o si la base aún no se ha cargado
   if text == "" or not loaded then
     loadEntries(render)
   else
@@ -109,31 +117,36 @@ function onActivate(id)
     launcher.setQuery("")
     return
   end
+
   if id == "action:start" then
     noctalia.runAsync(`setsid -f {DAEMON} "{DB}" >>"$XDG_RUNTIME_DIR/kp-daemon.log" 2>&1`)
     noctalia.notify("KeePass", "Introduce la contraseña en la ventana")
     return
   end
+
   if id == "action:lock" then
     noctalia.runAsync(`{CURL} -X POST http://kp/lock`, function()
       entries, loaded = {}, false
+      launcher.setQuery("")
     end, 5000)
     return
   end
+
   local n = string.match(id, "^entry:(%d+)$")
   if n ~= nil then
     launcher.setQuery("#" .. n .. " ")
     return
   end
+
   local field, i = string.match(id, "^copy:(%a+):(%d+)$")
   if field == nil then
     return
   end
   local e = entries[tonumber(i)]
-  -- el id viene del demonio: solo se deja pasar si es alfanumérico/guiones
   if e == nil or type(e.id) ~= "string" or string.match(e.id, "^[%w%-]+$") == nil then
     return
   end
+
   api(`/entry/{e.id}/{field}`, function(ok, value)
     if ok and value ~= "" then
       noctalia.copyToClipboard(value, "text/plain;charset=utf-8")
