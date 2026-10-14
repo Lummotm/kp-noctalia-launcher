@@ -1,0 +1,20 @@
+# KeePass launcher provider: escribe `/kp` en el launcher.
+
+id = "Lummotm/keepass"
+name = "KeePass"
+version = "0.1.0"
+plugin_api = 9
+author = "Lummotm"
+license = "MIT"
+dependencies = []
+tags = ["launcher", "privacy", "utility"]
+icon = "lock"
+description = "Busca entradas de tu base KeePass desde el launcher y copia usuario, contraseña o TOTP."
+
+[[launcher_provider]]
+id = "finder"
+entry = "finder.luau"
+prefix = "kp"
+glyph = "lock"
+include_in_global_search = false
+debounce_ms = 200
